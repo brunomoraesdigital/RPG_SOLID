@@ -3,29 +3,39 @@ using System.Collections;
 
 public class CerebroInimigo : MonoBehaviour
 {
-    [Header("--- ZONAS FIXAS ---")]
+    [Header("--- OBJETO DE MORTE ---")]
+    public GameObject prefabCadaver; // 🟤 Arraste o círculo marrom aqui!
+
+    [Header("--- ZONAS FIXAS (Âncora no Spawn) ---")]
     public float raioPatrulha = 3f;
     public float raioPerseguicao = 6f;
 
-    [Header("--- ZONA MÓVEL ---")]
+    [Header("--- ZONA MÓVEL (Segue o Inimigo) ---")]
     public float raioVisao = 3f;
 
     [Header("--- STATUS ---")]
     public float velocidade = 2f;
-    public float hpAtual = 500f; // ❤️ Vida total
+    public float hpMaximo = 500f;
+    public float hpAtual = 500f;
 
     private Rigidbody2D rb;
+    private SpriteRenderer sr;
+    private Collider2D col;
     private Transform alvoJogador;
     private Vector2 pontoInicial;
     private Vector2 destinoPatrulha;
 
     private bool estaPerseguindo = false;
     private bool estaEsperando = false;
+    private bool estaMorto = false;
     private float cronometroAbortar = 0f;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        sr = GetComponent<SpriteRenderer>();
+        col = GetComponent<Collider2D>();
+
         pontoInicial = transform.position;
         destinoPatrulha = pontoInicial;
 
@@ -35,12 +45,13 @@ public class CerebroInimigo : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (alvoJogador == null) return;
+        if (alvoJogador == null || estaMorto) return;
 
         float distCorpoAoJogador = Vector2.Distance(transform.position, alvoJogador.position);
         float distSpawnAoJogador = Vector2.Distance(pontoInicial, alvoJogador.position);
 
-        if (distCorpoAoJogador <= raioVisao && distSpawnAoJogador <= raioPerseguicao)
+        // REGRA: Persegue se estiver na visão E território OU se já estiver perseguindo (ataque)
+        if ((distCorpoAoJogador <= raioVisao && distSpawnAoJogador <= raioPerseguicao) || (estaPerseguindo && distSpawnAoJogador <= raioPerseguicao))
         {
             if (!estaPerseguindo)
             {
@@ -58,33 +69,60 @@ public class CerebroInimigo : MonoBehaviour
             }
         }
 
-        if (estaPerseguindo)
-            MoverPara(alvoJogador.position);
-        else
-            ExecutarPatrulha();
+        if (estaPerseguindo) MoverPara(alvoJogador.position);
+        else ExecutarPatrulha();
     }
 
-    // --- SISTEMA DE COMBATE ---
-
-    // ⚔️ Esta é a função que o jogador vai "chamar"
     public void ReceberDano(float dano)
     {
-        hpAtual -= dano;
-        Debug.Log("Inimigo levou dano! HP: " + hpAtual);
+        if (estaMorto) return;
 
-        if (hpAtual <= 0)
-        {
-            Morrer();
-        }
+        hpAtual -= dano;
+        estaPerseguindo = true;
+        Debug.Log("Inimigo atingido! HP: " + hpAtual);
+
+        if (hpAtual <= 0) Morrer();
     }
 
     void Morrer()
     {
-        Debug.Log("Inimigo morreu!");
-        Destroy(gameObject); // Remove o inimigo da cena
+        estaMorto = true;
+        estaPerseguindo = false;
+        rb.linearVelocity = Vector2.zero;
+
+        // 🟤 1. Cria o cadáver no chão
+        if (prefabCadaver != null)
+        {
+            Instantiate(prefabCadaver, transform.position, Quaternion.identity);
+        }
+
+        // 👻 2. "Esconde" o inimigo enquanto ele espera o respawn
+        sr.enabled = false;
+        col.enabled = false;
+
+        Debug.Log("Inimigo derrotado! Renascendo em 30s...");
+        StartCoroutine(RotinaRespawn());
     }
 
-    // --- MOVIMENTAÇÃO ---
+    IEnumerator RotinaRespawn()
+    {
+        yield return new WaitForSeconds(30f);
+
+        // Só renasce se o jogador estiver longe do ponto inicial
+        while (Vector2.Distance(pontoInicial, alvoJogador.position) < raioPatrulha + 2f)
+        {
+            yield return new WaitForSeconds(2f);
+        }
+
+        // ✨ Ressurreição: Reativa o visual e a física
+        estaMorto = false;
+        hpAtual = hpMaximo;
+        transform.position = pontoInicial;
+        sr.enabled = true;
+        col.enabled = true;
+
+        Debug.Log("Inimigo renasceu!");
+    }
 
     void ExecutarPatrulha()
     {
@@ -95,10 +133,7 @@ public class CerebroInimigo : MonoBehaviour
         {
             if (!estaEsperando) StartCoroutine(EsperarEPatroar());
         }
-        else
-        {
-            MoverPara(destinoPatrulha);
-        }
+        else MoverPara(destinoPatrulha);
     }
 
     void MoverPara(Vector2 alvo)
@@ -127,11 +162,5 @@ public class CerebroInimigo : MonoBehaviour
         Gizmos.DrawWireSphere(centro, raioPatrulha);
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(centro, raioPerseguicao);
-
-        if (Application.isPlaying)
-        {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(transform.position, destinoPatrulha);
-        }
     }
 }
