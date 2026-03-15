@@ -19,6 +19,7 @@ public class CerebroJogador : MonoBehaviour
 
     void Update()
     {
+        if (GerenteConsole.instancia != null && GerenteConsole.instancia.EstaDigitando()) return;
         if (Keyboard.current != null)
         {
             float x = 0;

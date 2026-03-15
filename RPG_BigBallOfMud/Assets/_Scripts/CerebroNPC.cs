@@ -3,6 +3,7 @@ using UnityEngine.AI;
 
 public class CerebroNPC : MonoBehaviour
 {
+    private int contadorTeste = 0;
     [SerializeField] Transform JOGADOR;
     private NavMeshAgent agent;
 
@@ -37,6 +38,8 @@ public class CerebroNPC : MonoBehaviour
             if (!jaFalou)
             {
                 Debug.Log("NPC DIZ: Cuidado, aventureiro! Há lobos famintos nesta floresta.");
+                contadorTeste++; // Aumenta 1 toda vez que entra no raio
+                GerenteConsole.instancia.EscreverNoConsole("NPC: Cuidado! (Mensagem " + contadorTeste + ")");
                 jaFalou = true;
             }
 
