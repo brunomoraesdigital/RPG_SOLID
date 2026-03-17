@@ -12,13 +12,15 @@ public class CerebroInimigo : MonoBehaviour
     private Vector3 pontoRespawn;
 
     [Header("Raios de Ação")]
-    [SerializeField] float raioVadiagem = 3f;      // Amarelo
-    [SerializeField] float raioVisao = 4f;         // Azul
-    [SerializeField] float raioPerseguicao = 8f;   // Vermelho
+    [SerializeField] float raioVadiagem = 3f;
+    [SerializeField] float raioVisao = 4f;
+    [SerializeField] float raioPerseguicao = 8f;
+    [SerializeField] float alcanceAtaque = 1.2f;
 
     private bool estaBravo = false;
     private bool estaComMedo = false;
     private float cronometroPatrulha;
+    private float cronometroAtaque;
     [SerializeField] float tempoEsperaPatrulha = 2f;
 
     void Start()
@@ -41,8 +43,6 @@ public class CerebroInimigo : MonoBehaviour
         float distJogadorProSpawn = Vector3.Distance(pontoRespawn, JOGADOR.position);
         float distInimigoProSpawn = Vector3.Distance(transform.position, pontoRespawn);
 
-        // 1. LÓGICA DE FUGA (COELHO OU GALINHA QUE APANHOU)
-        // A Galinha continua com medo enquanto o jogador estiver na visão OU enquanto não chegar no spawn
         bool deveFugir = (tipoMonstro == Temperamento.Coelho_Covarde && distJogador <= raioVisao) ||
                          (estaComMedo && distJogador <= raioVisao);
 
@@ -50,32 +50,48 @@ public class CerebroInimigo : MonoBehaviour
         {
             FugirDoJogador();
         }
-        // 2. LÓGICA DE PERSEGUIÇÃO (LOBO OU RATO QUE APANHOU)
         else if ((tipoMonstro == Temperamento.Lobo_Agressivo && distJogador <= raioVisao && distJogadorProSpawn <= raioPerseguicao) ||
                  (estaBravo && distJogadorProSpawn <= raioPerseguicao))
         {
-            agent.isStopped = false;
-            agent.SetDestination(JOGADOR.position);
+            // CORREÇÃO: Para de andar se estiver no alcance do ataque
+            if (distJogador <= alcanceAtaque)
+            {
+                agent.isStopped = true;
+                ExecutarAtaqueMonstro();
+            }
+            else
+            {
+                agent.isStopped = false;
+                agent.SetDestination(JOGADOR.position);
+            }
         }
-        // 3. RETORNO E VADIAGEM
         else
         {
-            // REGRA DA GALINHA: Só volta a ser passiva quando estiver perto do spawn e longe do jogador
-            if (estaComMedo && distInimigoProSpawn <= 1.0f && distJogador > raioVisao)
-            {
-                estaComMedo = false;
-            }
-
-            // REGRA DO RATO: Volta a ser passivo se o jogador sair da área de perseguição
-            if (estaBravo && distJogadorProSpawn > raioPerseguicao)
-            {
-                estaBravo = false;
-            }
-
+            if (estaComMedo && distInimigoProSpawn <= 1.0f && distJogador > raioVisao) estaComMedo = false;
+            if (estaBravo && distJogadorProSpawn > raioPerseguicao) estaBravo = false;
             Patrulhar();
         }
 
         AjustarRotacaoVisual();
+    }
+
+    void ExecutarAtaqueMonstro()
+    {
+        cronometroAtaque += Time.deltaTime;
+        if (cronometroAtaque >= 1f)
+        {
+            // Monstro também solta um bastão (cor diferente para diferenciar)
+            GameObject bastao = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(bastao.GetComponent<MeshCollider>());
+            bastao.transform.SetParent(this.transform);
+            bastao.transform.localPosition = new Vector3(0.8f, 0, 0);
+            bastao.transform.localRotation = Quaternion.identity;
+            bastao.transform.localScale = new Vector3(1f, 0.2f, 1f);
+            bastao.GetComponent<Renderer>().material.color = Color.red; // Bastão vermelho para monstro
+            Destroy(bastao, 0.2f);
+
+            cronometroAtaque = 0;
+        }
     }
 
     public void ReceberAcerto()

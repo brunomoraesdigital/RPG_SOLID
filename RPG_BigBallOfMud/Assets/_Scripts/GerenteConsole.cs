@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
-using System; // Adicionado para usar o Action
+using System;
 
 public class GerenteConsole : MonoBehaviour
 {
@@ -10,25 +10,30 @@ public class GerenteConsole : MonoBehaviour
     [SerializeField] private TextMeshProUGUI textoLog;
     [SerializeField] private TMP_InputField inputField;
 
-    // A PONTE: Evento para os NPCs ouvirem
     public static event Action<string> AcaoMensagemEnviada;
-
     private List<string> historicoMensagens = new List<string>();
 
-    void Awake()
-    {
-        instancia = this;
-    }
+    void Awake() { instancia = this; }
 
     void Start()
     {
         if (inputField != null)
         {
             inputField.onSubmit.AddListener(delegate { EnviarPeloEnter(); });
+            inputField.DeactivateInputField();
         }
     }
 
-    void Update() { }
+    void Update()
+    {
+        if (Keyboard.current.enterKey.wasPressedThisFrame)
+        {
+            if (!inputField.isFocused)
+            {
+                inputField.ActivateInputField();
+            }
+        }
+    }
 
     private void EnviarPeloEnter()
     {
@@ -36,13 +41,14 @@ public class GerenteConsole : MonoBehaviour
         {
             string textoDigitado = inputField.text;
             EscreverNoConsole("VOCÊ: " + textoDigitado);
-
-            // GRITA PARA O MUNDO: NPCs escutam aqui
             AcaoMensagemEnviada?.Invoke(textoDigitado);
 
             inputField.text = "";
-            inputField.ActivateInputField();
         }
+
+        // CORREÇÃO: Força a saída do foco e desativa o input
+        inputField.DeactivateInputField();
+        UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
     }
 
     public void EscreverNoConsole(string mensagem)
@@ -51,14 +57,8 @@ public class GerenteConsole : MonoBehaviour
         if (historicoMensagens.Count > 3) { historicoMensagens.RemoveAt(0); }
 
         textoLog.text = "";
-        foreach (string frase in historicoMensagens)
-        {
-            textoLog.text += frase + "\n";
-        }
+        foreach (string frase in historicoMensagens) { textoLog.text += frase + "\n"; }
     }
 
-    public bool EstaDigitando()
-    {
-        return inputField != null && inputField.isFocused;
-    }
+    public bool EstaDigitando() { return inputField.isFocused; }
 }
