@@ -15,7 +15,7 @@ public class CerebroInimigo : MonoBehaviour
     [SerializeField] float raioVadiagem = 3f;
     [SerializeField] float raioVisao = 4f;
     [SerializeField] float raioPerseguicao = 8f;
-    [SerializeField] float alcanceAtaque = 1.2f;
+    [SerializeField] float alcanceAtaque = 1.5f; // Aumentado para 1.5 para evitar o empurrão físico
 
     private bool estaBravo = false;
     private bool estaComMedo = false;
@@ -31,8 +31,9 @@ public class CerebroInimigo : MonoBehaviour
         pontoRespawn = transform.position;
         cronometroPatrulha = tempoEsperaPatrulha;
 
+        // Mantém as restrições para não rotacionar sozinho
         if (GetComponent<Rigidbody2D>() != null)
-            GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeAll;
+            GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeRotation;
     }
 
     void Update()
@@ -53,10 +54,11 @@ public class CerebroInimigo : MonoBehaviour
         else if ((tipoMonstro == Temperamento.Lobo_Agressivo && distJogador <= raioVisao && distJogadorProSpawn <= raioPerseguicao) ||
                  (estaBravo && distJogadorProSpawn <= raioPerseguicao))
         {
-            // CORREÇÃO: Para de andar se estiver no alcance do ataque
+            // CORREÇÃO: Para o agente um pouco antes para evitar o empurrão
             if (distJogador <= alcanceAtaque)
             {
                 agent.isStopped = true;
+                agent.velocity = Vector3.zero; // Zera a velocidade para travar no lugar
                 ExecutarAtaqueMonstro();
             }
             else
@@ -80,16 +82,20 @@ public class CerebroInimigo : MonoBehaviour
         cronometroAtaque += Time.deltaTime;
         if (cronometroAtaque >= 1f)
         {
-            // Monstro também solta um bastão (cor diferente para diferenciar)
             GameObject bastao = GameObject.CreatePrimitive(PrimitiveType.Quad);
             Destroy(bastao.GetComponent<MeshCollider>());
             bastao.transform.SetParent(this.transform);
-            bastao.transform.localPosition = new Vector3(0.8f, 0, 0);
+
+            // CORREÇÃO: Z em -0.1f para garantir que fique por cima de tudo
+            bastao.transform.localPosition = new Vector3(0.8f, 0, -0.1f);
             bastao.transform.localRotation = Quaternion.identity;
             bastao.transform.localScale = new Vector3(1f, 0.2f, 1f);
-            bastao.GetComponent<Renderer>().material.color = Color.red; // Bastão vermelho para monstro
-            Destroy(bastao, 0.2f);
 
+            Renderer rend = bastao.GetComponent<Renderer>();
+            rend.material.color = Color.red;
+            rend.sortingOrder = 10; // Garante que apareça acima do jogador
+
+            Destroy(bastao, 0.2f);
             cronometroAtaque = 0;
         }
     }

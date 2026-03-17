@@ -19,6 +19,7 @@ public class GerenteConsole : MonoBehaviour
     {
         if (inputField != null)
         {
+            // O segredo para o Enter sair do foco está aqui e no método abaixo
             inputField.onSubmit.AddListener(delegate { EnviarPeloEnter(); });
             inputField.DeactivateInputField();
         }
@@ -42,13 +43,15 @@ public class GerenteConsole : MonoBehaviour
             string textoDigitado = inputField.text;
             EscreverNoConsole("VOCÊ: " + textoDigitado);
             AcaoMensagemEnviada?.Invoke(textoDigitado);
-
             inputField.text = "";
         }
 
-        // CORREÇÃO: Força a saída do foco e desativa o input
+        // CORREÇÃO: Desativa o campo e remove o foco do EventSystem para voltar ao jogo
         inputField.DeactivateInputField();
-        UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+        if (UnityEngine.EventSystems.EventSystem.current != null)
+        {
+            UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+        }
     }
 
     public void EscreverNoConsole(string mensagem)
