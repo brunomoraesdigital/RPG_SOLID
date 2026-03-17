@@ -19,9 +19,14 @@ public class CerebroNPC : MonoBehaviour
     [SerializeField] float tempoEsperaPatrulha = 3f;
     private float cronometroPatrulha;
     private bool jaFalou = false;
+    private bool encerrouConversaForce = false;
 
-    // Controle de dicas para o Aventureiro
     private int ultimaDicaIndice = -1;
+    private float cronometroResposta = 0f;
+    private bool aguardandoResposta = false;
+
+    void OnEnable() { GerenteConsole.AcaoMensagemEnviada += OuvirJogador; }
+    void OnDisable() { GerenteConsole.AcaoMensagemEnviada -= OuvirJogador; }
 
     void Start()
     {
@@ -43,67 +48,142 @@ public class CerebroNPC : MonoBehaviour
 
         if (distanciaProJogador <= raioVisao)
         {
-            if (!jaFalou)
+            if (!jaFalou && !encerrouConversaForce)
             {
-                ExecutarFalaRPG();
+                ExecutarPerguntaInicial();
                 jaFalou = true;
             }
-            agent.isStopped = true;
-            OlharSuaveParaOJogador(); // NOVO: Olha para você suavemente
+
+            if (aguardandoResposta)
+            {
+                agent.isStopped = true;
+                OlharSuaveParaOJogador(); // Só olha enquanto aguarda sim/não/palavra-chave
+
+                cronometroResposta += Time.deltaTime;
+                if (cronometroResposta >= 15f)
+                {
+                    FicarBravoPorDemora();
+                }
+            }
+            else
+            {
+                // Se não está aguardando (conversa acabou), volta a vadiar mesmo dentro do raio
+                agent.isStopped = false;
+                ExecutarVadiagemNPC();
+                AjustarRotacaoVisual();
+            }
         }
         else
         {
-            agent.isStopped = false;
+            // Reset ao sair do raio
             jaFalou = false;
+            encerrouConversaForce = false;
+            aguardandoResposta = false;
+            agent.isStopped = false;
             ExecutarVadiagemNPC();
-            AjustarRotacaoVisual(); // Volta a olhar para onde caminha
+            AjustarRotacaoVisual();
         }
     }
 
-    void ExecutarFalaRPG()
+    void ExecutarPerguntaInicial()
     {
         string mensagem = "";
-        contadorTeste++;
+        aguardandoResposta = true;
+        cronometroResposta = 0f;
 
-        if (tipoDesteNPC == TipoNPC.Aventureiro)
+        switch (tipoDesteNPC)
         {
-            // Lógica de dicas aleatórias sem repetir a anterior
-            string[] dicas = {
-                "Lobo cercam o norte. Mantenha o aço afiado!",
-                "Cuidado com os ratos. Eles parecem calmos, mas atacam se chegar perto!",
-                "Não perca tempo com as galinhas. Vão fugir antes de você atacar.",
-                "Coelhos são medrosos. Correm ao menor sinal de perigo."
-            };
+            case TipoNPC.Aventureiro: mensagem = "AVENTUREIRO: Deseja uma dica para sobreviver nestas terras?"; break;
+            case TipoNPC.Mercador: mensagem = "MERCADOR: Pelas barbas de Odin! Olhe essas mercadorias. Deseja trocar seu ouro por algo útil?"; break;
+            case TipoNPC.AssistenteGuilda: mensagem = "ASSISTENTE: Bem-vindo à representação da Guilda. Procuras por novas missões ou suporte?"; break;
+        }
 
-            int novoIndice;
-            do
+        if (GerenteConsole.instancia != null) GerenteConsole.instancia.EscreverNoConsole(mensagem);
+    }
+
+    void OuvirJogador(string texto)
+    {
+        float distancia = Vector2.Distance(transform.position, JOGADOR.position);
+        if (distancia > raioVisao) return;
+
+        // Gatilho de Voz: Se o jogador falar qualquer coisa vadiando, reinicia
+        if (encerrouConversaForce || !aguardandoResposta)
+        {
+            encerrouConversaForce = false;
+            jaFalou = false;
+            return;
+        }
+
+        string msg = texto.ToLower();
+        string resposta = "";
+
+        if (tipoDesteNPC == TipoNPC.Mercador)
+        {
+            if (msg == "sim") { resposta = "MERCADOR: Excelente escolha! Veja o brilho destas espadas, a flexibilidade desse arco, o poder desse cajado e a pureza destas poções. O que vai levar?"; }
+            else if (msg == "não" || msg == "nao") { resposta = "MERCADOR: Pois bem... ouro parado não compra glória. Volte quando decidir investir em sua sobrevivência."; FinalizarConversa(); }
+            else if (msg.Contains("espada") || msg.Contains("cajado") || msg.Contains("flecha") || msg.Contains("arco") || msg.Contains("poção"))
             {
-                novoIndice = Random.Range(0, dicas.Length);
-            } while (novoIndice == ultimaDicaIndice);
-
-            ultimaDicaIndice = novoIndice;
-            mensagem = "AVENTUREIRO: " + dicas[novoIndice] + " (" + contadorTeste + ")";
+                resposta = "MERCADOR: Isso custa 50 ouros! Mas espere... você não tem um tostão! Saia daqui e só volte quando tiver ouro!";
+                FinalizarConversa(); // Volta a vadiar após dar o valor
+            }
+            else { resposta = "MERCADOR: Pelos deuses, pare de balbuciar! Tempo é ouro e você me faz perder ambos. Suma da minha frente!"; FinalizarConversa(); }
         }
-        else if (tipoDesteNPC == TipoNPC.Mercador)
+        else if (tipoDesteNPC == TipoNPC.AssistenteGuilda)
         {
-            mensagem = "MERCADOR: Pelas barbas de Odin! Deseja trocar seu ouro por algo útil? (" + contadorTeste + ")";
+            if (msg == "sim") { resposta = "ASSISTENTE: A Guilda agradece sua disposição. Tenho contratos de caça e escolta disponíveis. Qual seu interesse?"; }
+            else if (msg == "não" || msg == "nao") { resposta = "ASSISTENTE: Entendo. Estarei aqui caso mude de ideia. Que a sorte acompanhe seus passos."; FinalizarConversa(); }
+            else if (msg.Contains("caça")) { string[] monstros = { "Lobos", "Ratos", "Galinhas" }; resposta = "ASSISTENTE: O dever chama! Vá caçar " + monstros[Random.Range(0, 3)] + " e honre seu nome!"; FinalizarConversa(); }
+            else if (msg.Contains("escolta")) { resposta = "ASSISTENTE: Precisamos de um grupo para missões de escolta. Volte quando não estiver sozinho."; FinalizarConversa(); }
+            else { resposta = "ASSISTENTE: Se não veio em busca de trabalho, por favor, não obstrua a recepção."; FinalizarConversa(); }
         }
-        else
+        else if (tipoDesteNPC == TipoNPC.Aventureiro)
         {
-            mensagem = "ASSISTENTE: Bem-vindo à Guilda. Procuras missões ou suporte? (" + contadorTeste + ")";
+            if (msg == "sim" || msg.Contains("dica"))
+            {
+                string[] dicas = {
+                    "Ouça bem... lobos cercam o norte. Mantenha o aço afiado!",
+                    "Cuidado com os ratos. Eles parecem calmos, mas atacam se chegar perto!",
+                    "Não perca tempo com as galinhas. Vão fugir antes de você atacar.",
+                    "Coelhos são as criaturas mais rápidas e medrosas. Correm ao menor sinal."
+                };
+                int novoIndice; do { novoIndice = Random.Range(0, dicas.Length); } while (novoIndice == ultimaDicaIndice);
+                ultimaDicaIndice = novoIndice;
+                resposta = "AVENTUREIRO: " + dicas[novoIndice];
+                FinalizarConversa(); // Volta a vadiar após dar a dica
+            }
+            else if (msg == "não" || msg == "nao") { resposta = "AVENTUREIRO: A arrogância é o primeiro passo para o túmulo. Siga seu caminho, então."; FinalizarConversa(); }
+            else { resposta = "AVENTUREIRO: Suas palavras são confusas como um mapa borrado. Vá treinar e volte quando souber o que perguntar!"; FinalizarConversa(); }
         }
 
-        if (GerenteConsole.instancia != null)
-            GerenteConsole.instancia.EscreverNoConsole(mensagem);
+        if (GerenteConsole.instancia != null && resposta != "") GerenteConsole.instancia.EscreverNoConsole(resposta);
+    }
+
+    void FicarBravoPorDemora()
+    {
+        string bravo = "";
+        switch (tipoDesteNPC)
+        {
+            case TipoNPC.Mercador: bravo = "MERCADOR: O tempo está passando e meu ouro não está aumentando. Pare de gastar meu fôlego!"; break;
+            case TipoNPC.AssistenteGuilda: bravo = "ASSISTENTE: Tenho uma fila de heróis de verdade esperando. Saia da frente!"; break;
+            case TipoNPC.Aventureiro: bravo = "AVENTUREIRO: Se vai ficar aí parado como uma estátua, que os corvos te façam companhia. Adeus!"; break;
+        }
+        if (GerenteConsole.instancia != null) GerenteConsole.instancia.EscreverNoConsole(bravo);
+        FinalizarConversa();
+    }
+
+    void FinalizarConversa()
+    {
+        aguardandoResposta = false;
+        encerrouConversaForce = true;
+        agent.isStopped = false;
+        cronometroResposta = 0f;
     }
 
     void OlharSuaveParaOJogador()
     {
         Vector3 direcao = (JOGADOR.position - transform.position).normalized;
         float angulo = Mathf.Atan2(direcao.y, direcao.x) * Mathf.Rad2Deg;
-        Quaternion rotacaoAlvo = Quaternion.Euler(0, 0, angulo);
-        // 5f é a velocidade da suavidade
-        transform.rotation = Quaternion.Lerp(transform.rotation, rotacaoAlvo, Time.deltaTime * 5f);
+        transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0, 0, angulo), Time.deltaTime * 5f);
     }
 
     void ExecutarVadiagemNPC()
@@ -113,13 +193,10 @@ public class CerebroNPC : MonoBehaviour
             cronometroPatrulha -= Time.deltaTime;
             if (cronometroPatrulha <= 0)
             {
-                Vector2 pontoAleatorio = Random.insideUnitCircle * raioVadiagem;
-                Vector3 destinoFinal = pontoRespawn + new Vector3(pontoAleatorio.x, pontoAleatorio.y, 0);
-
-                NavMeshHit hit;
-                if (NavMesh.SamplePosition(destinoFinal, out hit, 1.0f, NavMesh.AllAreas))
-                    agent.SetDestination(hit.position);
-
+                Vector2 p = Random.insideUnitCircle * raioVadiagem;
+                Vector3 d = pontoRespawn + new Vector3(p.x, p.y, 0);
+                NavMeshHit h;
+                if (NavMesh.SamplePosition(d, out h, 1.0f, NavMesh.AllAreas)) agent.SetDestination(h.position);
                 cronometroPatrulha = tempoEsperaPatrulha;
             }
         }
@@ -137,9 +214,7 @@ public class CerebroNPC : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Vector3 centro = Application.isPlaying ? pontoRespawn : transform.position;
-        Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(centro, raioVadiagem);
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(transform.position, raioVisao);
+        Gizmos.color = Color.green; Gizmos.DrawWireSphere(centro, raioVadiagem);
+        Gizmos.color = Color.blue; Gizmos.DrawWireSphere(transform.position, raioVisao);
     }
 }
