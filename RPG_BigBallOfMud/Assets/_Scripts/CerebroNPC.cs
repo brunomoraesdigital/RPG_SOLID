@@ -8,7 +8,6 @@ public class CerebroNPC : MonoBehaviour
     [Header("Configurações do NPC")]
     public TipoNPC tipoDesteNPC;
 
-    private int contadorTeste = 0;
     [SerializeField] Transform JOGADOR;
     private NavMeshAgent agent;
 
