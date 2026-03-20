@@ -84,19 +84,23 @@ public class CerebroInimigo : MonoBehaviour
         {
             if (mensagemAcaoDisparada)
             {
-                if (estaComMedo && distInimigoProSpawn <= 1.5f)
+                // RESET PARA QUEM FOGE (Galinha/Coelho)
+                if ((estaComMedo || tipoMonstro == Temperamento.Coelho_Covarde) && distJogador > raioVisao)
                 {
-                    if (tipoMonstro == Temperamento.Galinha_PassivoCovarde) EnviarLog("A galinha saiu da sua visao, ela esta voltando pro seu ninho.");
+                    if (tipoMonstro == Temperamento.Galinha_PassivoCovarde && estaComMedo) EnviarLog("A galinha saiu da sua visao, ela esta voltando pro seu ninho.");
                     if (tipoMonstro == Temperamento.Coelho_Covarde) EnviarLog("O coelho conseguiu sair da sua visao, ele esta voltando pra sua toca.");
+
                     mensagemAcaoDisparada = false;
-                    estaComMedo = false;
+                    estaComMedo = false; // Galinha volta a ser passiva aqui
                 }
+                // RESET PARA QUEM PERSEGUE (Lobo/Rato)
                 else if (distJogadorProSpawn > raioPerseguicao || (tipoMonstro == Temperamento.Lobo_Agressivo && distJogador > raioVisao))
                 {
                     if (tipoMonstro == Temperamento.Lobo_Agressivo) EnviarLog("O lobo desistiu da perseguicao com ar de satisfacao.");
                     if (tipoMonstro == Temperamento.Rato_PassivoAgressivo) EnviarLog("O rato desistiu da perseguicao com ar indignado.");
+
                     mensagemAcaoDisparada = false;
-                    estaBravo = false;
+                    estaBravo = false; // Rato para de te seguir aqui
                 }
             }
 

@@ -57,7 +57,7 @@ public class CerebroNPC : MonoBehaviour
             if (aguardandoResposta)
             {
                 agent.isStopped = true;
-                OlharSuaveParaOJogador(); // Só olha enquanto aguarda sim/não/palavra-chave
+                OlharSuaveParaOJogador(); 
 
                 cronometroResposta += Time.deltaTime;
                 if (cronometroResposta >= 15f)
@@ -67,7 +67,6 @@ public class CerebroNPC : MonoBehaviour
             }
             else
             {
-                // Se não está aguardando (conversa acabou), volta a vadiar mesmo dentro do raio
                 agent.isStopped = false;
                 ExecutarVadiagemNPC();
                 AjustarRotacaoVisual();
@@ -75,7 +74,6 @@ public class CerebroNPC : MonoBehaviour
         }
         else
         {
-            // Reset ao sair do raio
             jaFalou = false;
             encerrouConversaForce = false;
             aguardandoResposta = false;
@@ -106,7 +104,6 @@ public class CerebroNPC : MonoBehaviour
         float distancia = Vector2.Distance(transform.position, JOGADOR.position);
         if (distancia > raioVisao) return;
 
-        // Gatilho de Voz: Se o jogador falar qualquer coisa vadiando, reinicia
         if (encerrouConversaForce || !aguardandoResposta)
         {
             encerrouConversaForce = false;
@@ -124,7 +121,7 @@ public class CerebroNPC : MonoBehaviour
             else if (msg.Contains("espada") || msg.Contains("cajado") || msg.Contains("flecha") || msg.Contains("arco") || msg.Contains("poção"))
             {
                 resposta = "MERCADOR: Isso custa 50 ouros! Mas espere... você não tem um tostão! Saia daqui e só volte quando tiver ouro!";
-                FinalizarConversa(); // Volta a vadiar após dar o valor
+                FinalizarConversa(); 
             }
             else { resposta = "MERCADOR: Pelos deuses, pare de balbuciar! Tempo é ouro e você me faz perder ambos. Suma da minha frente!"; FinalizarConversa(); }
         }
@@ -149,7 +146,7 @@ public class CerebroNPC : MonoBehaviour
                 int novoIndice; do { novoIndice = Random.Range(0, dicas.Length); } while (novoIndice == ultimaDicaIndice);
                 ultimaDicaIndice = novoIndice;
                 resposta = "AVENTUREIRO: " + dicas[novoIndice];
-                FinalizarConversa(); // Volta a vadiar após dar a dica
+                FinalizarConversa(); 
             }
             else if (msg == "não" || msg == "nao") { resposta = "AVENTUREIRO: A arrogância é o primeiro passo para o túmulo. Siga seu caminho, então."; FinalizarConversa(); }
             else { resposta = "AVENTUREIRO: Suas palavras são confusas como um mapa borrado. Vá treinar e volte quando souber o que perguntar!"; FinalizarConversa(); }
